@@ -32,9 +32,7 @@ end
 
 function Module:EnsureFolder()
 	if not isfolder(self.SaveFolder) then
-		pcall(function()
-			makefolder(self.SaveFolder)
-		end)
+		pcall(makefolder, self.SaveFolder)
 	end
 end
 
@@ -50,11 +48,10 @@ function Module:Save()
 		return HttpService:JSONEncode(self.Config)
 	end)
 	if success and encoded and encoded ~= LastSave then
-		pcall(function()
-			writefile(self.SaveFile, encoded)
-		end)
+		pcall(writefile, self.SaveFile, encoded)
 		LastSave = encoded
 	end
+
 	Saving = false
 end
 
@@ -81,25 +78,34 @@ end
 function Module:Ex(name)
 	return function(func)
 		self.ExList[name] = func
+		if self.Config[name] and not self.Threads[name] then
+			task.defer(function()
+				self:RunEx(name)
+			end)
+		end
 	end
 end
 
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
 	if self.Threads[name] then return end
+
 	self.Config[name] = true
+
 	self.Threads[name] = task.spawn(function()
 		xpcall(function()
 			self.ExList[name](self)
 		end,function(err)
 			warn("Ex Error:", name, err)
 		end)
+
 		self.Threads[name] = nil
 	end)
 end
 
 function Module:StopEx(name)
 	self.Config[name] = false
+
 	if self.Threads[name] then
 		task.cancel(self.Threads[name])
 		self.Threads[name] = nil
@@ -116,7 +122,7 @@ function Module:AddToggle(where,data)
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Default or false
 	end
-	return where:Toggle({
+	local toggle = where:Toggle({
 		Title = data.Title,
 		Desc = data.Desc,
 		Value = self.Config[data.Title],
@@ -128,12 +134,17 @@ function Module:AddToggle(where,data)
 			end
 			self:Save()
 			if data.Callback then
-				pcall(function()
-					data.Callback(state)
-				end)
+				pcall(data.Callback, state)
 			end
 		end
 	})
+	if self.Config[data.Title] and self.ExList[data.Title] then
+		task.defer(function()
+			self:RunEx(data.Title)
+		end)
+	end
+
+	return toggle
 end
 
 function Module:AddButton(where,data)
@@ -163,9 +174,7 @@ function Module:AddDropdown(where,data)
 			self.Config[data.Title] = option
 			self:Save()
 			if data.Callback then
-				pcall(function()
-					data.Callback(option)
-				end)
+				pcall(data.Callback, option)
 			end
 		end
 	})
@@ -186,16 +195,13 @@ function Module:AddInput(where,data)
 			self.Config[data.Title] = text
 			self:Save()
 			if data.Callback then
-				pcall(function()
-					data.Callback(text)
-				end)
+				pcall(data.Callback, text)
 			end
 		end
 	})
 end
 
 function Module:AddSlider(where,data)
-
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Value.Default
 	end
@@ -212,9 +218,7 @@ function Module:AddSlider(where,data)
 			self.Config[data.Title] = value
 			self:Save()
 			if data.Callback then
-				pcall(function()
-					data.Callback(value)
-				end)
+				pcall(data.Callback, value)
 			end
 		end
 	})
