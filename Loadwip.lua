@@ -18,12 +18,20 @@ local HttpService = Service.HttpService
 Module.Config = {}
 Module.ExList = {}
 Module.Threads = {}
-
 Module.SaveFolder = "SmoothX"
 Module.SaveFile = nil
 
 local LastSave = ""
 local Saving = false
+
+function Module:GetConfig(key)
+	return self.Config[key]
+end
+
+function Module:SetConfig(key, value)
+	self.Config[key] = value
+	self:Save()
+end
 
 function Module:SetSaveFolder(folderName)
 	self.SaveFolder = folderName
@@ -42,19 +50,15 @@ function Module:Save()
 	if not self.SaveFile then
 		self:SetSaveFolder(self.SaveFolder)
 	end
-
 	Saving = true
 	self:EnsureFolder()
-
 	local success, encoded = pcall(function()
 		return HttpService:JSONEncode(self.Config)
 	end)
-
 	if success and encoded and encoded ~= LastSave then
 		pcall(writefile, self.SaveFile, encoded)
 		LastSave = encoded
 	end
-
 	Saving = false
 end
 
@@ -93,7 +97,9 @@ end
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
 	if self.Threads[name] then return end
+
 	self.Config[name] = true
+
 	self.Threads[name] = task.spawn(function()
 		xpcall(function()
 			self.ExList[name](self)
@@ -121,21 +127,27 @@ function Module:StopAll()
 end
 
 function Module:Method()
-	local method = self.Config["Select Method"] or "Behind"
-	local dist = self.Config["Distance Farm"] or 0
+	local method = self:GetConfig("Select Method") or "Behind"
+	local dist = self:GetConfig("Distance Farm") or 0
+
 	if method == "Behind" then
 		return CFrame.new(0, 0, dist)
+
 	elseif method == "Below" then
 		return CFrame.new(0, -dist, 0)
 			* CFrame.Angles(math.rad(90), 0, 0)
+
 	elseif method == "Upper" then
 		return CFrame.new(0, dist, 0)
 			* CFrame.Angles(math.rad(-90), 0, 0)
 	end
+
 	return CFrame.new()
 end
 
+
 function Module:AddToggle(where,data)
+
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Default or false
 	end
@@ -144,28 +156,59 @@ function Module:AddToggle(where,data)
 		Desc = data.Desc,
 		Value = self.Config[data.Title],
 		Callback = function(state)
-
+			self:SetConfig(data.Title, state)
 			if state then
 				self:RunEx(data.Title)
 			else
 				self:StopEx(data.Title)
 			end
-
-			self:Save()
-
 			if data.Callback then
 				pcall(data.Callback, state)
 			end
 		end
 	})
-
 	if self.Config[data.Title] and self.ExList[data.Title] then
 		task.defer(function()
 			self:RunEx(data.Title)
 		end)
 	end
-
 	return toggle
+end
+
+function Module:AddButton(where,data)
+	return where:Button({
+		Title = data.Title,
+		Desc = data.Desc,
+		Locked = data.Locked or false,
+		Callback = function()
+			if data.Callback then
+				pcall(data.Callback)
+			end
+		end
+	})
+end
+
+function Module:AddInput(where,data)
+	if self.Config[data.Title] == nil then
+		self.Config[data.Title] = data.Value or ""
+	end
+	return where:Input({
+		Title = data.Title,
+		Desc = data.Desc,
+		Value = self.Config[data.Title],
+		InputIcon = data.InputIcon,
+		Type = data.Type or "Input",
+		Placeholder = data.Placeholder,
+		Callback = function(text)
+			self.Config[data.Title] = text
+			self:Save()
+			if data.Callback then
+				pcall(function()
+					data.Callback(text)
+				end)
+			end
+		end
+	})
 end
 
 function Module:AddDropdown(where,data)
@@ -179,9 +222,7 @@ function Module:AddDropdown(where,data)
 		Values = data.Values,
 		Value = self.Config[data.Title],
 		Callback = function(option)
-			self.Config[data.Title] = option
-			self:Save()
-
+			self:SetConfig(data.Title, option)
 			if data.Callback then
 				pcall(data.Callback, option)
 			end
@@ -202,9 +243,10 @@ function Module:AddSlider(where,data)
 			Max = data.Value.Max,
 			Default = self.Config[data.Title],
 		},
+
 		Callback = function(value)
-			self.Config[data.Title] = value
-			self:Save()
+			self:SetConfig(data.Title, value)
+
 			if data.Callback then
 				pcall(data.Callback, value)
 			end
