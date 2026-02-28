@@ -35,7 +35,7 @@ end
 
 function Module:SetSaveFolder(folderName)
 	self.SaveFolder = folderName
-	self.SaveFile = self.SaveFolder .. "/" .. LocalPlayer.UserId .. ".json"
+	self.SaveFile = self.SaveFolder .. ".json"
 end
 
 function Module:EnsureFolder()
@@ -93,6 +93,39 @@ function Module:Ex(name)
 		end
 	end
 end
+
+function Module:Noclip(name)
+	while task.wait(0.1) do
+        pcall(function()
+            if not anticlip and name then
+                for _, v in pairs(LocalPlayer.Character:GetChildren()) do
+                    if v:IsA("BasePart") then
+                        if v.CanCollide then
+                            v.CanCollide = false
+                        end
+                    end
+                end
+                if not LocalPlayer.Character:FindFirstChild("HumanoidRootPart"):FindFirstChild("Velocity") then
+                    local bv = Instance.new("BodyVelocity")
+                    bv.Name = "Velocity"
+                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                    bv.Velocity = Vector3.new(0, 0, 0)
+                    bv.Parent = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                end
+            else
+                local vel = LocalPlayer.Character:FindFirstChild("HumanoidRootPart"):FindFirstChild("Velocity")
+                if vel then
+                    vel:Destroy()
+                end
+                for _, v in pairs(LocalPlayer.Character:GetChildren()) do
+                    if v:IsA("BasePart") then
+                        v.CanCollide = true
+                    end
+                end
+            end
+        end)
+    end
+end 
 
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
