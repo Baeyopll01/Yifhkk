@@ -2,9 +2,9 @@ local Module = {}
 
 function Module:NameList()
 	local Names = {
-		"1",
-		"2",
-		"3"
+		"8",
+		"9",
+		"0"
 	}
 	return Names
 end
