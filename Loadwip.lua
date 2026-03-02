@@ -94,8 +94,6 @@ function Module:Load()
 	self:Save()
 end
 
--- ================= EX SYSTEM =================
-
 function Module:Ex(name)
 	self.ExList[name] = self.ExList[name] or {}
 	self.Threads[name] = self.Threads[name] or {}
@@ -112,14 +110,12 @@ end
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
 	self.Threads[name] = self.Threads[name] or {}
-	for i = #self.Threads[name], 1, -1 do
-		if coroutine.status(self.Threads[name][i]) == "dead" then
-			table.remove(self.Threads[name], i)
-		end
+	if self.Config[name] == true and #self.Threads[name] > 0 then
+		return
 	end
-	if #self.Threads[name] > 0 then return end
 	self.Config[name] = true
 	self:Save()
+	self.Threads[name] = {}
 	for _, data in ipairs(self.ExList[name]) do
 		local thread = task.spawn(function()
 			local success, err = xpcall(function()
@@ -130,6 +126,7 @@ function Module:RunEx(name)
 				warn("Ex Error:", name, err)
 			end
 		end)
+
 		table.insert(self.Threads[name], thread)
 	end
 end
