@@ -101,38 +101,17 @@ end
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
 	self.Threads[name] = self.Threads[name] or {}
-	self._RunningFlags[name] = true
 	if #self.Threads[name] > 0 then return end
 	self.Config[name] = true
-	for index, data in ipairs(self.ExList[name]) do
-		local thread
-		thread = task.spawn(function()
-			while self._RunningFlags[name] do
-				local success, err = xpcall(function()
-					data.Callback(self)
-				end, debug.traceback)
-				if not success then
-					warn("SmoothX Ex Error:", name, err)
-					if not data.Restart then
-						break
-					end
-					task.wait(1)
-				else
-					break
-				end
-
+	for _, data in ipairs(self.ExList[name]) do
+		local thread = task.spawn(function()
+			local success, err = xpcall(function()
+				data.Callback(self)
+			end, debug.traceback)
+			if not success then
+				warn("Ex Error:", name, err)
 			end
-			if self.Threads[name] then
-				for i,v in ipairs(self.Threads[name]) do
-					if v == thread then
-						table.remove(self.Threads[name], i)
-						break
-					end
-				end
-			end
-
 		end)
-
 		table.insert(self.Threads[name], thread)
 	end
 end
