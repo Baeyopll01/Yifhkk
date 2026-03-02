@@ -16,13 +16,13 @@ local LocalPlayer = Players.LocalPlayer
 local HttpService = Service.HttpService
 
 Module.Config = {}
-Module.ExList = {} 
+Module.ExList = {}
 Module.Threads = {}
 Module.SaveFolder = "SmoothX"
 Module.SaveFile = nil
 
 local LastSave = ""
-local Saving = false
+local SaveQueue = false
 
 function Module:GetConfig(key)
 	return self.Config[key]
@@ -45,21 +45,31 @@ function Module:EnsureFolder()
 end
 
 function Module:Save()
-	if Saving then return end
+	if SaveQueue then return end
 	if not (readfile and writefile and isfile and isfolder and makefolder) then return end
 	if not self.SaveFile then
 		self:SetSaveFolder(self.SaveFolder)
 	end
-	Saving = true
-	self:EnsureFolder()
-	local success, encoded = pcall(function()
-		return HttpService:JSONEncode(self.Config)
+	SaveQueue = true
+	task.spawn(function()
+		task.wait(0.2)
+		self:EnsureFolder()
+		local success, encoded = pcall(function()
+			return HttpService:JSONEncode(self.Config)
+		end)
+		if success and encoded and encoded ~= LastSave then
+			local tmpFile = self.SaveFile .. ".tmp"
+
+			local ok = pcall(writefile, tmpFile, encoded)
+			if ok then
+				pcall(delfile, self.SaveFile)
+				pcall(writefile, self.SaveFile, encoded)
+				pcall(delfile, tmpFile)
+				LastSave = encoded
+			end
+		end
+		SaveQueue = false
 	end)
-	if success and encoded and encoded ~= LastSave then
-		pcall(writefile, self.SaveFile, encoded)
-		LastSave = encoded
-	end
-	Saving = false
 end
 
 function Module:Load()
@@ -72,25 +82,34 @@ function Module:Load()
 		self:Save()
 		return
 	end
+	local raw = readfile(self.SaveFile)
+	if not raw or raw == "" then
+		warn("Save empty. Resetting.")
+		self:Save()
+		return
+	end
 	local success, data = pcall(function()
-		return HttpService:JSONDecode(readfile(self.SaveFile))
+		return HttpService:JSONDecode(raw)
 	end)
 	if success and type(data) == "table" then
-		for k, v in next, data do
+		for k, v in pairs(data) do
 			self.Config[k] = v
 		end
+		LastSave = raw
+	else
+		warn("Save corrupted. Resetting.")
+		pcall(delfile, self.SaveFile)
+		self.Config = {}
+		self:Save()
 	end
 end
 
 function Module:Ex(name)
 	self.ExList[name] = self.ExList[name] or {}
 	self.Threads[name] = self.Threads[name] or {}
-	self._RunningFlags = self._RunningFlags or {}
-
 	return function(func)
 		table.insert(self.ExList[name], {
-			Callback = func,
-			Restart = true 
+			Callback = func
 		})
 		if self.Config[name] then
 			self:RunEx(name)
@@ -101,6 +120,11 @@ end
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
 	self.Threads[name] = self.Threads[name] or {}
+	for i = #self.Threads[name], 1, -1 do
+		if coroutine.status(self.Threads[name][i]) == "dead" then
+			table.remove(self.Threads[name], i)
+		end
+	end
 	if #self.Threads[name] > 0 then return end
 	self.Config[name] = true
 	for _, data in ipairs(self.ExList[name]) do
@@ -108,17 +132,18 @@ function Module:RunEx(name)
 			local success, err = xpcall(function()
 				data.Callback(self)
 			end, debug.traceback)
+
 			if not success then
 				warn("Ex Error:", name, err)
 			end
 		end)
+
 		table.insert(self.Threads[name], thread)
 	end
 end
 
 function Module:StopEx(name)
 	self.Config[name] = false
-	self._RunningFlags[name] = false
 
 	if self.Threads[name] then
 		for _, thread in ipairs(self.Threads[name]) do
@@ -158,17 +183,20 @@ function Module:AddToggle(where,data)
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Default or false
 	end
+
 	local toggle = where:Toggle({
 		Title = data.Title,
 		Desc = data.Desc,
 		Value = self.Config[data.Title],
 		Callback = function(state)
 			self:SetConfig(data.Title, state)
+
 			if state then
 				self:RunEx(data.Title)
 			else
 				self:StopEx(data.Title)
 			end
+
 			if data.Callback then
 				pcall(data.Callback, state)
 			end
@@ -256,5 +284,8 @@ function Module:AddSlider(where,data)
 		end
 	})
 end
+
+Module:SetSaveFolder(Module.SaveFolder)
+Module:Load()
 
 return Module
