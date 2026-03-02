@@ -16,7 +16,7 @@ local LocalPlayer = Players.LocalPlayer
 local HttpService = Service.HttpService
 
 Module.Config = {}
-Module.ExList = {}
+Module.ExList = {} 
 Module.Threads = {}
 Module.SaveFolder = "SmoothX"
 Module.SaveFile = nil
@@ -83,40 +83,51 @@ function Module:Load()
 end
 
 function Module:Ex(name)
+	self.ExList[name] = self.ExList[name] or {}
+	self.Threads[name] = self.Threads[name] or {}
 	return function(func)
-		self.ExList[name] = func
-
-		if self.Config[name] and not self.Threads[name] then
-			task.defer(function()
-				self:RunEx(name)
-			end)
+		table.insert(self.ExList[name], func)
+		if self.Config[name] then
+			self:RunEx(name)
 		end
 	end
 end
 
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
-	if self.Threads[name] then return end
-
+	if self.Threads[name] and #self.Threads[name] > 0 then return end
 	self.Config[name] = true
-
-	self.Threads[name] = task.spawn(function()
-		xpcall(function()
-			self.ExList[name](self)
-		end,function(err)
-			warn("Ex Error:", name, err)
+	self.Threads[name] = {}
+	for _, func in ipairs(self.ExList[name]) do
+		local thread
+		thread = task.spawn(function()
+			xpcall(function()
+				func(self)
+			end,function(err)
+				warn("Ex Error:", name, err)
+			end)
+			if self.Threads[name] then
+				for i,v in ipairs(self.Threads[name]) do
+					if v == thread then
+						table.remove(self.Threads[name], i)
+						break
+					end
+				end
+			end
 		end)
 
-		self.Threads[name] = nil
-	end)
+		table.insert(self.Threads[name], thread)
+	end
 end
 
 function Module:StopEx(name)
 	self.Config[name] = false
 
 	if self.Threads[name] then
-		task.cancel(self.Threads[name])
-		self.Threads[name] = nil
+		for _, thread in ipairs(self.Threads[name]) do
+			pcall(task.cancel, thread)
+		end
+		self.Threads[name] = {}
 	end
 end
 
@@ -144,7 +155,6 @@ function Module:Method()
 
 	return CFrame.new()
 end
-
 
 function Module:AddToggle(where,data)
 
@@ -203,9 +213,7 @@ function Module:AddInput(where,data)
 			self.Config[data.Title] = text
 			self:Save()
 			if data.Callback then
-				pcall(function()
-					data.Callback(text)
-				end)
+				pcall(data.Callback, text)
 			end
 		end
 	})
@@ -243,10 +251,8 @@ function Module:AddSlider(where,data)
 			Max = data.Value.Max,
 			Default = self.Config[data.Title],
 		},
-
 		Callback = function(value)
 			self:SetConfig(data.Title, value)
-
 			if data.Callback then
 				pcall(data.Callback, value)
 			end
