@@ -22,13 +22,15 @@ Module.SaveFolder = "SmoothX"
 Module.SaveFile = nil
 
 local LastSave = ""
-local SaveQueue = false
 
 function Module:GetConfig(key)
 	return self.Config[key]
 end
 
 function Module:SetConfig(key, value)
+	if self.Config[key] == value then
+		return
+	end
 	self.Config[key] = value
 	self:Save()
 end
@@ -45,64 +47,54 @@ function Module:EnsureFolder()
 end
 
 function Module:Save()
-	if SaveQueue then return end
-	if not (readfile and writefile and isfile and isfolder and makefolder) then return end
+	if not (readfile and writefile and isfile and isfolder and makefolder) then
+		return
+	end
 	if not self.SaveFile then
 		self:SetSaveFolder(self.SaveFolder)
 	end
-	SaveQueue = true
-	task.spawn(function()
-		task.wait(0.2)
-		self:EnsureFolder()
-		local success, encoded = pcall(function()
-			return HttpService:JSONEncode(self.Config)
-		end)
-		if success and encoded and encoded ~= LastSave then
-			local tmpFile = self.SaveFile .. ".tmp"
-
-			local ok = pcall(writefile, tmpFile, encoded)
-			if ok then
-				pcall(delfile, self.SaveFile)
-				pcall(writefile, self.SaveFile, encoded)
-				pcall(delfile, tmpFile)
-				LastSave = encoded
-			end
-		end
-		SaveQueue = false
+	self:EnsureFolder()
+	local success, encoded = pcall(function()
+		return HttpService:JSONEncode(self.Config)
 	end)
+	if success and encoded and encoded ~= LastSave then
+		pcall(writefile, self.SaveFile, encoded)
+		LastSave = encoded
+	end
 end
 
 function Module:Load()
-	if not (readfile and isfile) then return end
+	if not (readfile and isfile) then
+		return
+	end
+
 	if not self.SaveFile then
 		self:SetSaveFolder(self.SaveFolder)
 	end
 	self:EnsureFolder()
 	if not isfile(self.SaveFile) then
+		self.Config = {}
 		self:Save()
 		return
 	end
 	local raw = readfile(self.SaveFile)
-	if not raw or raw == "" then
-		warn("Save empty. Resetting.")
-		self:Save()
-		return
-	end
-	local success, data = pcall(function()
-		return HttpService:JSONDecode(raw)
-	end)
-	if success and type(data) == "table" then
-		for k, v in pairs(data) do
-			self.Config[k] = v
+	if raw and raw ~= "" then
+		local success, data = pcall(function()
+			return HttpService:JSONDecode(raw)
+		end)
+
+		if success and type(data) == "table" then
+			self.Config = data
+			LastSave = raw
+			return
 		end
-		LastSave = raw
-	else
-		warn("Save corrupted. Resetting.")
-		pcall(delfile, self.SaveFile)
-		self.Config = {}
-		self:Save()
 	end
+	pcall(delfile, self.SaveFile)
+	self.Config = {}
+	self:Save()
 end
+
+-- ================= EX SYSTEM =================
 
 function Module:Ex(name)
 	self.ExList[name] = self.ExList[name] or {}
@@ -127,6 +119,7 @@ function Module:RunEx(name)
 	end
 	if #self.Threads[name] > 0 then return end
 	self.Config[name] = true
+	self:Save()
 	for _, data in ipairs(self.ExList[name]) do
 		local thread = task.spawn(function()
 			local success, err = xpcall(function()
@@ -137,13 +130,13 @@ function Module:RunEx(name)
 				warn("Ex Error:", name, err)
 			end
 		end)
-
 		table.insert(self.Threads[name], thread)
 	end
 end
 
 function Module:StopEx(name)
 	self.Config[name] = false
+	self:Save()
 
 	if self.Threads[name] then
 		for _, thread in ipairs(self.Threads[name]) do
@@ -179,11 +172,9 @@ function Module:Method()
 end
 
 function Module:AddToggle(where,data)
-
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Default or false
 	end
-
 	local toggle = where:Toggle({
 		Title = data.Title,
 		Desc = data.Desc,
@@ -207,6 +198,7 @@ function Module:AddToggle(where,data)
 			self:RunEx(data.Title)
 		end)
 	end
+
 	return toggle
 end
 
@@ -235,8 +227,7 @@ function Module:AddInput(where,data)
 		Type = data.Type or "Input",
 		Placeholder = data.Placeholder,
 		Callback = function(text)
-			self.Config[data.Title] = text
-			self:Save()
+			self:SetConfig(data.Title, text)
 			if data.Callback then
 				pcall(data.Callback, text)
 			end
