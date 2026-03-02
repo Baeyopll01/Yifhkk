@@ -85,8 +85,13 @@ end
 function Module:Ex(name)
 	self.ExList[name] = self.ExList[name] or {}
 	self.Threads[name] = self.Threads[name] or {}
+	self._RunningFlags = self._RunningFlags or {}
+
 	return function(func)
-		table.insert(self.ExList[name], func)
+		table.insert(self.ExList[name], {
+			Callback = func,
+			Restart = true 
+		})
 		if self.Config[name] then
 			self:RunEx(name)
 		end
@@ -95,17 +100,28 @@ end
 
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
-	if self.Threads[name] and #self.Threads[name] > 0 then return end
+	self.Threads[name] = self.Threads[name] or {}
+	self._RunningFlags[name] = true
+	if #self.Threads[name] > 0 then return end
 	self.Config[name] = true
-	self.Threads[name] = {}
-	for _, func in ipairs(self.ExList[name]) do
+	for index, data in ipairs(self.ExList[name]) do
 		local thread
 		thread = task.spawn(function()
-			xpcall(function()
-				func(self)
-			end,function(err)
-				warn("Ex Error:", name, err)
-			end)
+			while self._RunningFlags[name] do
+				local success, err = xpcall(function()
+					data.Callback(self)
+				end, debug.traceback)
+				if not success then
+					warn("SmoothX Ex Error:", name, err)
+					if not data.Restart then
+						break
+					end
+					task.wait(1)
+				else
+					break
+				end
+
+			end
 			if self.Threads[name] then
 				for i,v in ipairs(self.Threads[name]) do
 					if v == thread then
@@ -114,6 +130,7 @@ function Module:RunEx(name)
 					end
 				end
 			end
+
 		end)
 
 		table.insert(self.Threads[name], thread)
@@ -122,6 +139,7 @@ end
 
 function Module:StopEx(name)
 	self.Config[name] = false
+	self._RunningFlags[name] = false
 
 	if self.Threads[name] then
 		for _, thread in ipairs(self.Threads[name]) do
