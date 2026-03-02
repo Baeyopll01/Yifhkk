@@ -109,24 +109,15 @@ end
 
 function Module:RunEx(name)
 	if not self.ExList[name] then return end
-	self.Threads[name] = self.Threads[name] or {}
-	if self.Config[name] == true and #self.Threads[name] > 0 then
-		return
-	end
+	self.Threads[name] = {}
 	self.Config[name] = true
 	self:Save()
-	self.Threads[name] = {}
 	for _, data in ipairs(self.ExList[name]) do
 		local thread = task.spawn(function()
-			local success, err = xpcall(function()
+			xpcall(function()
 				data.Callback(self)
-			end, debug.traceback)
-
-			if not success then
-				warn("Ex Error:", name, err)
-			end
+			end, warn)
 		end)
-
 		table.insert(self.Threads[name], thread)
 	end
 end
