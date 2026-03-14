@@ -108,7 +108,7 @@ function Module:AddToggle(where,data)
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Default or false
 	end
-	local thread
+	local threadRunning
 	local toggle = where:Toggle({
 		Title = data.Title,
 		Desc = data.Desc,
@@ -118,14 +118,10 @@ function Module:AddToggle(where,data)
 			local fn = self.Ex_Function[data.Title]
 			if fn then
 				if state then
-					thread = task.spawn(function()
-						pcall(fn,self)
-					end)
-				else
-					if thread then
-						task.cancel(thread)
-						thread = nil
-					end
+					threadRunning = task.spawn(fn)
+				elseif threadRunning then
+					task.cancel(threadRunning)
+					threadRunning = nil
 				end
 			end
 			if data.Callback then
