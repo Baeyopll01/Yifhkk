@@ -18,8 +18,8 @@ local HttpService = Service.HttpService
 Module.Config = Module.Config or {}
 Module.Ex_Function = Module.Ex_Function or {}
 
-local Module.SaveFolder = "SmoothX"
-local SaveFile = SaveFolder.."/Config.json"
+Module.SaveFolder = "SmoothX"
+local SaveFile = Module.SaveFolder.."/Config.json"
 
 local function EncodeCFrame(cf)
 	local x,y,z = cf.Position.X,cf.Position.Y,cf.Position.Z
@@ -39,8 +39,8 @@ function Module:LoadSettings()
 	if not (readfile and writefile and isfile and isfolder and makefolder) then
 		return warn("Executor Not Support Save System")
 	end
-	if not isfolder(SaveFolder) then
-		makefolder(SaveFolder)
+	if not isfolder(Module.SaveFolder) then
+		makefolder(Module.SaveFolder)
 	end
 	if not isfile(SaveFile) then
 		self:SaveSettings()
@@ -126,14 +126,14 @@ function Module:AddDropdown(where,data)
 		Multi = data.Multi or false,
 		Values = data.Values,
 		Value = self.Config[data.Title],
-	})
-	Callback = function(option)
-		self.Config[data.Title] = option
-        if data.Callback then
-            data.Callback(option)
+        Callback = function(option)
+            self.Config[data.Title] = option
+            if data.Callback then
+                data.Callback(option)
+            end
+            self:SaveSettings()
         end
-        self:SaveSettings()
-	end
+    })
 	return dropdown
 end
 
