@@ -70,7 +70,7 @@ function Module:LoadSettings()
 	end
 	local success,data = pcall(function()
 		return HttpService:JSONDecode(readfile(SaveFile))
-	end)                      
+	end)
 	if success and type(data) == "table" then
 		for k,v in next,data do
 			if typeof(v) == "table" and v.X then
@@ -87,8 +87,8 @@ end
 function Module:SaveSettings()
 	if not (readfile and writefile and isfile and isfolder and makefolder) then
 		return
-	end 
-	local saveData = {} 
+	end
+	local saveData = {}
 	for k,v in next,self.Config do
 		if typeof(v) == "CFrame" then
 			saveData[k] = EncodeCFrame(v)
@@ -119,7 +119,7 @@ function Module:AddToggle(where,data)
 			if fn then
 				if state then
 					thread = task.spawn(function()
-						fn(self)
+						pcall(fn,self)
 					end)
 				else
 					if thread then
@@ -184,13 +184,12 @@ function Module:AddSlider(where,data)
 			Max = data.Value.Max,
 			Default = self.Config[data.Title]
 		},
-
 		Callback = function(value)
 			self.Config[data.Title] = value
 			if data.Callback then
 				data.Callback(value)
 			end
-			self:SaveSettings() 
+			self:SaveSettings()
 		end
 	})
 	return slider
@@ -219,8 +218,8 @@ function Module:AddInput(where,data)
 	return textbox
 end
 
-Module:LoadSettings()
 Module:SetSaveFolder(Module.SaveFolder)
+Module:LoadSettings()
 Module:GetConfig(Module.Config)
 Module:SetFun(Module.Ex_Function)
 
