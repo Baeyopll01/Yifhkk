@@ -19,7 +19,7 @@ Module.Config = Module.Config or {}
 Module.Ex_Function = Module.Ex_Function or {}
 
 Module.SaveFolder = "SmoothX"
-local SaveFile = Module.SaveFolder.."/Config.json"
+local SaveFile = Module.SaveFolder.."/config.json"
 
 local function EncodeCFrame(cf)
 	local x,y,z = cf.Position.X,cf.Position.Y,cf.Position.Z
@@ -35,9 +35,19 @@ local function DecodeCFrame(t)
 	end
 end
 
+local function EnsureFolder(path)
+	local current = ""
+	for part in string.gmatch(path, "[^/]+") do
+		current = current == "" and part or (current.."/"..part)
+		if not isfolder(current) then
+			makefolder(current)
+		end
+	end
+end
+
 function Module:SetSaveFolder(folder)
 	self.SaveFolder = folder
-	SaveFile = folder.."/Config.json"
+	SaveFile = folder.."/config.json"
 end
 
 function Module:GetConfig(tbl)
@@ -61,16 +71,20 @@ function Module:LoadSettings()
 	if not (readfile and writefile and isfile and isfolder and makefolder) then
 		return warn("Executor Not Support Save System")
 	end
+
 	if not isfolder(self.SaveFolder) then
-		makefolder(self.SaveFolder)
+		EnsureFolder(self.SaveFolder)
 	end
+
 	if not isfile(SaveFile) then
 		self:SaveSettings()
 		return
 	end
+
 	local success,data = pcall(function()
 		return HttpService:JSONDecode(readfile(SaveFile))
 	end)
+
 	if success and type(data) == "table" then
 		for k,v in next,data do
 			if typeof(v) == "table" and v.X then
@@ -88,7 +102,13 @@ function Module:SaveSettings()
 	if not (readfile and writefile and isfile and isfolder and makefolder) then
 		return
 	end
+
+	if not isfolder(self.SaveFolder) then
+		EnsureFolder(self.SaveFolder)
+	end
+
 	local saveData = {}
+
 	for k,v in next,self.Config do
 		if typeof(v) == "CFrame" then
 			saveData[k] = EncodeCFrame(v)
@@ -96,9 +116,11 @@ function Module:SaveSettings()
 			saveData[k] = v
 		end
 	end
+
 	local success,encoded = pcall(function()
 		return HttpService:JSONEncode(saveData)
 	end)
+
 	if success then
 		writefile(SaveFile,encoded)
 	end
@@ -108,7 +130,9 @@ function Module:AddToggle(where,data)
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Default or false
 	end
+
 	local threadRunning
+
 	local function Run(state)
 		local fn = self.Ex_Function[data.Title]
 		if fn then
@@ -126,7 +150,9 @@ function Module:AddToggle(where,data)
 			end
 		end
 	end
+
 	Run(self.Config[data.Title])
+
 	local toggle = where:Toggle({
 		Title = data.Title,
 		Desc = data.Desc,
@@ -140,6 +166,7 @@ function Module:AddToggle(where,data)
 			self:SaveSettings()
 		end
 	})
+
 	return toggle
 end
 
@@ -147,6 +174,7 @@ function Module:AddDropdown(where,data)
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Value
 	end
+
 	local dropdown = where:Dropdown({
 		Title = data.Title,
 		Desc = data.Desc,
@@ -161,6 +189,7 @@ function Module:AddDropdown(where,data)
 			self:SaveSettings()
 		end
 	})
+
 	return dropdown
 end
 
@@ -181,6 +210,7 @@ function Module:AddSlider(where,data)
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Value.Default
 	end
+
 	local slider = where:Slider({
 		Title = data.Title,
 		Desc = data.Desc,
@@ -198,6 +228,7 @@ function Module:AddSlider(where,data)
 			self:SaveSettings()
 		end
 	})
+
 	return slider
 end
 
@@ -205,6 +236,7 @@ function Module:AddInput(where,data)
 	if self.Config[data.Title] == nil then
 		self.Config[data.Title] = data.Value or ""
 	end
+
 	local textbox = where:Input({
 		Title = data.Title,
 		Desc = data.Desc,
@@ -218,9 +250,9 @@ function Module:AddInput(where,data)
 				data.Callback(text)
 			end
 			self:SaveSettings()
-
 		end
 	})
+
 	return textbox
 end
 
