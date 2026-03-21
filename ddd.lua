@@ -103,8 +103,7 @@ for _,v in ipairs(Players:GetPlayers()) do
 	AddPlayer(v)
 end
 
-Play
-ers.PlayerAdded:Connect(AddPlayer)
+Players.PlayerAdded:Connect(AddPlayer)
 
 Players.PlayerRemoving:Connect(function(plr)
 	for _,v in ipairs(Scroll:GetChildren()) do
