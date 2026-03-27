@@ -7,7 +7,6 @@ local Mouse = game.Players.LocalPlayer:GetMouse()
 
 function library:BlurFrame(getFrame)
 	local MTREL = "Glass"
-	local binds = {}
 
 	local root = Instance.new('Folder')
 	root.Name = 'BlurSnox'
@@ -79,7 +78,9 @@ function library:BlurFrame(getFrame)
 			local Top_Look = (cf0 * za).LookVector
 			local Mid_Point = A + (CFrame.new(A, B).LookVector * para)
 			local Needed_Look = CFrame.new(Mid_Point, C).LookVector
+
 			local dot = Top_Look:Dot(Needed_Look)
+			dot = math.clamp(dot, -1, 1) -- 🔥 FIX acos
 
 			local ac = CFrame.Angles(0, 0, acos(dot))
 			cf0 = cf0 * ac
@@ -162,6 +163,37 @@ function library:BlurFrame(getFrame)
 		local tr = Vector2.new(br.X, tl.Y)
 		local bl = Vector2.new(tl.X, br.Y)
 
+		-- 🔥 FIX Rotation
+		local rot = 0
+		for _, v in ipairs(parents) do
+			rot = rot + v.Rotation
+		end
+
+		if rot ~= 0 and rot % 180 ~= 0 then
+			local mid = tl:Lerp(br, 0.5)
+			local s = math.sin(math.rad(rot))
+			local c = math.cos(math.rad(rot))
+
+			local function rotate(p)
+				return Vector2.new(
+					c*(p.X - mid.X) - s*(p.Y - mid.Y),
+					s*(p.X - mid.X) + c*(p.Y - mid.Y)
+				) + mid
+			end
+
+			tl = rotate(tl)
+			tr = rotate(tr)
+			bl = rotate(bl)
+			br = rotate(br)
+		end
+
+		-- 🔥 FIX parts กันหาย
+		if #parts < 4 then
+			for i = 1,4 do
+				parts[i] = parts[i] or nil
+			end
+		end
+
 		DrawQuad(
 			camera:ScreenPointToRay(tl.X, tl.Y, zIndex).Origin,
 			camera:ScreenPointToRay(tr.X, tr.Y, zIndex).Origin,
@@ -172,9 +204,11 @@ function library:BlurFrame(getFrame)
 
 		if first then
 			for _,pt in pairs(parts) do
-				pt.Parent = f
-				pt.Transparency = 0.98
-				pt.BrickColor = BrickColor.new("Institutional white")
+				if pt then
+					pt.Parent = f
+					pt.Transparency = 0.98
+					pt.BrickColor = BrickColor.new("Institutional white")
+				end
 			end
 		end
 	end
